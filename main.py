@@ -5,13 +5,8 @@ from tkinter import messagebox
 import requests
 import urllib.request
 
-apiKey = False
-mode = ''
-
 
 def send_api_request():
-    global apiKey
-    global mode
 
     selected_speaker = speaker_combo.get()
     selected_style = style_combo.get()
@@ -23,7 +18,7 @@ def send_api_request():
             for style in entry["styles"]:
                 if style["name"] == selected_style:
                     speaker_id = style['id']
-                    result_label.config(text=f"id: {style['id']}")
+                    print(speaker_id)
 
     try:
         # APIエンドポイントとパラメータを構築
@@ -44,6 +39,8 @@ def send_api_request():
         # 音声ファイルをダウンロード
         if 'mp3StreamingUrl' in response_data:
             mode = '高速' if response_data['isApiKeyValid'] else '低速'
+            print(mode)
+            labelMode.config(text=f"{mode}")
             mp3_url = response_data['mp3StreamingUrl']
             urllib.request.urlretrieve(mp3_url, "sample.mp3")
             messagebox.showinfo('ダイアログタイトル', 'ダウンロードが完了しました。')
@@ -104,8 +101,8 @@ win.title("VOICEVOX")
 win.geometry("400x300")
 
 # モード
-labelHeights = tk.Label(win, text=mode)
-labelHeights.pack()
+labelMode = tk.Label(win, text='')
+labelMode.pack()
 
 # 名前ラベル
 label = tk.Label(win, text='文字を入力してください')
@@ -130,9 +127,6 @@ style_label.pack()
 style_combo = ttk.Combobox(win, values=[])
 style_combo.pack()
 style_combo["state"] = "disabled"  # 初期状態ではスタイルは選択不可
-# ID表示用ラベル
-result_label = ttk.Label(win, text="")
-result_label.pack()
 # Speaker選択時にStyleの選択肢を更新
 speaker_combo.bind("<<ComboboxSelected>>", enable_style_selection)
 # VoiceVoxの話者データを取得
