@@ -6,8 +6,8 @@ import requests
 import urllib.request
 
 
-# 受け取ったjsonから、話者・スタイル・idに分けたJSONデータを作る
-def speak_json():
+# 受け取ったjsonから、話者・スタイル・idに分けた辞書を作る
+def speak_data():
     mapping = {}
 
     for idx, option in enumerate(requests.get('https://static.tts.quest/voicevox_speakers.json').json()):
@@ -21,42 +21,34 @@ def speak_json():
         style = option.split("（")[1][:-1]
 
         if speaker not in mapping:
-            mapping[speaker] = {"name": speaker, "styles": []}
+            mapping[speaker] = {"name": speaker, "styles": {}}
 
         # スタイル情報を追加
-        mapping[speaker]["styles"].append({"name": style, "id": idx})
+        mapping[speaker]["styles"][style] = idx
 
-    # マッピングをリストに変換
-    result = list(mapping.values())
-
-    # JSON形式に変換
-    return json.dumps(result, indent=4, ensure_ascii=False)
+    return mapping  # 辞書形式で返す
 
 
-# JSONデータを読み込む
-data = json.loads(speak_json())
+data = speak_data()
 
 
 # スピーカーが選択されたときにスタイルのプルダウンリストをアクティブにする関数
 def enable_style_selection(event):
-    for entry in data:
-        if entry["name"] == speaker_combo.get():  # 話者
-            style_values = [style["name"] for style in entry["styles"]]
-            style_combo["values"] = style_values
-            style_combo["state"] = "readonly"  # スタイルを選択可能にする
-            style_combo.set(style_values[0])  # デフォルトで最初のスタイルを選択
+    # 選択したスピーカーに関連するスタイルのリストを取得
+    style_data = data.get(speaker_combo.get(), {}).get("styles", {})
+    style_values = list(style_data.keys())
+    # スタイルの選択肢を更新
+    style_combo["values"] = style_values
+    style_combo["state"] = "readonly"  # スタイルを選択可能にするかどうかを設定
+    style_combo.set(style_values[0])  # デフォルトで最初のスタイルを選択
+    style_combo.style_data = style_data  # 追加: スタイルデータをコンボボックスのインスタンス変数として保存
 
 
 def send_api_request():
-    speaker_id = 0
-
+    style_data = style_combo.style_data  # 追加: コンボボックスからスタイルデータを取得
     # 話者とスタイルから、idを取得
-    for entry in data:
-        if entry["name"] == speaker_combo.get():  # 話者
-            for style in entry["styles"]:
-                if style["name"] == style_combo.get():  # スタイル
-                    speaker_id = style['id']
-                    print(f"id:{speaker_id}")
+    speaker_id = style_data.get(style_combo.get(), 0)
+    print(f"id:{speaker_id}")
 
     try:
         # APIエンドポイントとパラメータを構築
@@ -118,7 +110,7 @@ labelHeight.pack()
 # プルダウンリスト (Speaker)
 speaker_label = ttk.Label(win, text="Speaker:")
 speaker_label.pack()
-speaker_values = [entry["name"] for entry in data]
+speaker_values = list(data.keys())
 speaker_combo = ttk.Combobox(win, values=speaker_values)
 speaker_combo.pack()
 # プルダウンリスト (Style)
