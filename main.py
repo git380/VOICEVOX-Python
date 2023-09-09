@@ -6,53 +6,6 @@ import requests
 import urllib.request
 
 
-def send_api_request():
-
-    selected_speaker = speaker_combo.get()
-    selected_style = style_combo.get()
-    speaker_id = 0
-
-    # 話者とスタイルから、idを取得
-    for entry in data:
-        if entry["name"] == selected_speaker:
-            for style in entry["styles"]:
-                if style["name"] == selected_style:
-                    speaker_id = style['id']
-                    print(speaker_id)
-
-    try:
-        # APIエンドポイントとパラメータを構築
-        api_endpoint = 'https://api.tts.quest/v3/voicevox/synthesis'
-        text_to_speak = text.get()
-
-        # APIリクエストのパラメータを作成
-        params = {
-            'key': 'Z4F4i255201_58n',
-            'speaker': speaker_id,
-            'text': text_to_speak
-        }
-
-        # APIにリクエストを送信
-        response = requests.get(api_endpoint, params=params)
-        response_data = response.json()
-
-        # 音声ファイルをダウンロード
-        if 'mp3StreamingUrl' in response_data:
-            mode = '高速' if response_data['isApiKeyValid'] else '低速'
-            print(mode)
-            labelMode.config(text=f"{mode}")
-            mp3_url = response_data['mp3StreamingUrl']
-            urllib.request.urlretrieve(mp3_url, "sample.mp3")
-            messagebox.showinfo('ダイアログタイトル', 'ダウンロードが完了しました。')
-        elif 'errorMessage' in response_data:
-            messagebox.showerror('エラー', response_data['errorMessage'])
-        else:
-            messagebox.showerror('エラー', '音声の取得に失敗しました。')
-
-    except Exception as e:
-        messagebox.showerror('エラー', str(e))
-
-
 # 受け取ったjsonから、話者・スタイル・idに分けたJSONデータを作る
 def speak_json():
     mapping = {}
@@ -86,13 +39,60 @@ data = json.loads(speak_json())
 
 # スピーカーが選択されたときにスタイルのプルダウンリストをアクティブにする関数
 def enable_style_selection(event):
-    selected_speaker = speaker_combo.get()
     for entry in data:
-        if entry["name"] == selected_speaker:
+        if entry["name"] == speaker_combo.get():  # 話者
             style_values = [style["name"] for style in entry["styles"]]
             style_combo["values"] = style_values
             style_combo["state"] = "readonly"  # スタイルを選択可能にする
             style_combo.set(style_values[0])  # デフォルトで最初のスタイルを選択
+
+
+def send_api_request():
+    speaker_id = 0
+
+    # 話者とスタイルから、idを取得
+    for entry in data:
+        if entry["name"] == speaker_combo.get():  # 話者
+            for style in entry["styles"]:
+                if style["name"] == style_combo.get():  # スタイル
+                    speaker_id = style['id']
+                    print(f"id:{speaker_id}")
+
+    try:
+        # APIエンドポイントとパラメータを構築
+        api_endpoint = 'https://api.tts.quest/v3/voicevox/synthesis'
+        text_to_speak = text.get()
+
+        # APIリクエストのパラメータを作成
+        params = {
+            'key': 'Z4F4i255201_58n',
+            'speaker': speaker_id,
+            'text': text_to_speak
+        }
+
+        # APIにリクエストを送信
+        response = requests.get(api_endpoint, params=params)
+        response_data = response.json()
+
+        # 音声ファイルをダウンロード
+        if 'retryAfter' in response_data:
+            retry_after = response_data['retryAfter']
+            print(f"time:{1 + retry_after}")
+            win.after(1000 * (1 + retry_after), send_api_request)
+        elif 'mp3StreamingUrl' in response_data:
+            mode = '高速' if response_data['isApiKeyValid'] else '低速'
+            print(mode)
+            labelMode.config(text=f"{mode}")
+            mp3_url = response_data['mp3StreamingUrl']
+            urllib.request.urlretrieve(mp3_url, "sample.mp3")
+            messagebox.showinfo('ダイアログタイトル', 'ダウンロードが完了しました。')
+        elif 'errorMessage' in response_data:
+            messagebox.showerror('エラー', response_data['errorMessage'])
+        else:
+            messagebox.showerror('エラー', '音声の取得に失敗しました。')
+
+    except Exception as e:
+        messagebox.showerror('エラー', str(e))
 
 
 # ウィンドウを作成
