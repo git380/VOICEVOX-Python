@@ -7,23 +7,24 @@ import urllib.request
 
 # 受け取ったjsonから、話者・スタイル・idに分けた辞書を作る
 def speakers():
-    mapping = {'四国めたん': {'あまあま': 0, 'ノーマル': 2, 'セクシー': 4, 'ツンツン': 6}}
+    mapping = {}
     try:
         request = requests.get('https://static.tts.quest/voicevox_speakers.json').json()
         if 'success' not in request:
             for idx, option in enumerate(request):
                 # 'VOICEVOX:' の部分を削除
                 option = option[9:]
-                # '（' と '）' の間のスピーカー名を抽出
+                # 最初から'（' の間のスピーカー名を抽出
                 speaker = option.split('（')[0]
                 # '（' と '）' の間のスタイル名を抽出
                 style = option.split('（')[1][:-1]
-    
+
                 # 話者の追加
                 if speaker not in mapping:
-                    mapping[speaker] = {}
+                    mapping[speaker] = [[], []]
                 # スタイル情報とidを追加
-                mapping[speaker][style] = idx
+                mapping[speaker][0].append(style)
+                mapping[speaker][1].append(idx)
 
         return mapping  # 辞書形式で返す
     except requests.exceptions.RequestException as e:
@@ -38,7 +39,7 @@ speakers = speakers()
 def enable_style_selection(event):
     # 選択したスピーカーに関連するスタイルのリストを取得
     speaker_data = speakers[speaker_combo.get()]
-    style_values = list(speaker_data.keys())
+    style_values = speaker_data[0]
     # スタイルの選択肢を更新
     style_combo['values'] = style_values
     style_combo['state'] = 'readonly'  # スタイルを選択可能にするかどうかを設定
@@ -49,14 +50,14 @@ def enable_style_selection(event):
 def send_api_request():
     speaker_data = style_combo.speaker_data  # コンボボックスからスタイルデータを取得
     # 話者とスタイルから、idを取得
-    speaker_id = speaker_data[style_combo.get()]
+    speaker_id = speaker_data[1][style_combo.current()]
     print(f'話者:{speaker_combo.get()}　スタイル:{style_combo.get()}　id:{speaker_id}')
     speakerSelect.config(text=f'話者:{speaker_combo.get()}　スタイル:{style_combo.get()}　id:{speaker_id}')
 
     try:
         # APIリクエストのパラメータを作成
         params = {
-            'key': 'Z4F4i255201_58n',
+            'key': 'Z4F4i255201_58na',
             'speaker': speaker_id,
             'text': text.get()
         }
@@ -65,17 +66,18 @@ def send_api_request():
         response = requests.get('https://api.tts.quest/v3/voicevox/synthesis', params=params)
         response_data = response.json()
 
-        # 音声ファイルをダウンロード
         if 'retryAfter' in response_data:
             retry_after = response_data['retryAfter']
             print(f'time:{1 + retry_after}')
             win.after(1000 * (1 + retry_after), send_api_request)
-        elif 'mp3StreamingUrl' in response_data:
+        elif 'mp3StreamingUrl' in response_data:  # 音声ファイルをダウンロード
             mode = '高速' if response_data['isApiKeyValid'] else '低速'
             print(mode)
             labelMode.config(text=f'{mode}')
+            print('dl st')
             mp3_url = response_data['mp3StreamingUrl']
             urllib.request.urlretrieve(mp3_url, 'sample.mp3')
+            print('dl ok')
             messagebox.showinfo('ダイアログタイトル', 'ダウンロードが完了しました。')
         elif 'errorMessage' in response_data:
             messagebox.showerror('エラー', response_data['errorMessage'])
@@ -117,7 +119,7 @@ speaker_combo.bind('<<ComboboxSelected>>', enable_style_selection)
 # プルダウンリスト (Style)
 style_label = ttk.Label(win, text='Style:')
 style_label.pack()
-style_combo = ttk.Combobox(win, values=[])
+style_combo = ttk.Combobox(win, state="readonly", values=[])
 style_combo.pack()
 style_combo['state'] = 'disabled'  # 初期状態ではスタイルは選択不可
 
